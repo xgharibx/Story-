@@ -40,6 +40,7 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            isolation: isolate;
         }
 
         /* --- ISLAMIC PATTERN OVERLAY --- */
@@ -58,12 +59,11 @@
             position: absolute;
             top: 0; left: 0; width: 100%; height: 75%; /* Covers top 75% */
             z-index: 5;
-            /* Gradient mask to fade image into black at the bottom */
-            mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%);
-            -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%);
+            overflow: hidden;
         }
 
         .upload-trigger {
+            position: relative;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -73,7 +73,23 @@
             transition: background 0.3s;
         }
 
+        .image-fade-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            background: linear-gradient(
+                to bottom,
+                rgba(0, 0, 0, 0) 38%,
+                rgba(0, 0, 0, 0.12) 54%,
+                rgba(3, 7, 5, 0.48) 72%,
+                rgba(3, 7, 5, 0.92) 100%
+            );
+        }
+
         .upload-hint {
+            position: relative;
+            z-index: 2;
             color: #c5a059;
             font-family: 'Reem Kufi', sans-serif;
             text-align: center;
@@ -94,7 +110,7 @@
             object-fit: cover;
             object-position: center 20%; 
             display: none; 
-            z-index: -1;
+            z-index: 0;
         }
 
         /* --- GLASSMORPHISM CARD --- */
@@ -104,10 +120,9 @@
             left: 20px;
             right: 20px;
             z-index: 10;
-            /* Modern Glassmorphism */
-            background: rgba(18, 28, 24, 0.85); /* Slightly darker for readability */
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            background:
+                linear-gradient(180deg, rgba(20, 34, 28, 0.92) 0%, rgba(8, 16, 13, 0.97) 100%),
+                rgba(18, 28, 24, 0.94);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-top: 1px solid rgba(212, 175, 55, 0.4);
             border-bottom: 1px solid rgba(0,0,0,0.4);
@@ -243,6 +258,10 @@
             visibility: hidden;
         }
 
+        .is-exporting .content-card {
+            animation: none;
+        }
+
         @media (max-width: 520px) {
             body {
                 gap: 12px;
@@ -269,6 +288,7 @@
                     <div>اضغط لإضافة صورة</div>
                 </div>
                 <img id="sheikh-photo" class="sheikh-photo" alt="صورة الشيخ">
+                <div class="image-fade-overlay" aria-hidden="true"></div>
                 <input type="file" accept="image/*" onchange="previewImage(event)">
             </label>
         </div>
@@ -293,10 +313,10 @@
     </div>
 
     <div class="controls-bar">
-        <button type="button" class="download-button" id="download-button">تحميل كصورة JPG</button>
+        <button type="button" class="download-button" id="download-button">تحميل كصورة PNG</button>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.min.js"></script>
     <script>
         function previewImage(event) {
             const input = event.target;
@@ -314,12 +334,12 @@
             }
         }
 
-        async function downloadAsJpg() {
+        async function downloadAsPng() {
             const captureArea = document.getElementById('capture-area');
             const downloadButton = document.getElementById('download-button');
             const activeElement = document.activeElement;
 
-            if (!window.html2canvas) {
+            if (!window.htmlToImage) {
                 alert('تعذر تجهيز التصدير الآن.');
                 return;
             }
@@ -333,15 +353,24 @@
             downloadButton.textContent = 'جارٍ تجهيز الصورة...';
 
             try {
-                const canvas = await html2canvas(captureArea, {
-                    backgroundColor: null,
-                    useCORS: true,
-                    scale: Math.max(window.devicePixelRatio || 1, 2)
+                if (document.fonts && document.fonts.ready) {
+                    await document.fonts.ready;
+                }
+
+                const dataUrl = await window.htmlToImage.toPng(captureArea, {
+                    cacheBust: true,
+                    pixelRatio: Math.max(window.devicePixelRatio || 1, 2),
+                    canvasWidth: captureArea.clientWidth * 2,
+                    canvasHeight: captureArea.clientHeight * 2,
+                    style: {
+                        margin: '0',
+                        transform: 'none'
+                    }
                 });
 
                 const link = document.createElement('a');
-                link.download = 'story-design.jpg';
-                link.href = canvas.toDataURL('image/jpeg', 0.95);
+                link.download = 'story-design.png';
+                link.href = dataUrl;
                 link.click();
             } catch (error) {
                 console.error(error);
@@ -349,11 +378,11 @@
             } finally {
                 document.body.classList.remove('is-exporting');
                 downloadButton.disabled = false;
-                downloadButton.textContent = 'تحميل كصورة JPG';
+                downloadButton.textContent = 'تحميل كصورة PNG';
             }
         }
 
-        document.getElementById('download-button').addEventListener('click', downloadAsJpg);
+        document.getElementById('download-button').addEventListener('click', downloadAsPng);
     </script>
 
 </body>
